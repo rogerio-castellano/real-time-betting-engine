@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: betting-engine-backend
+spec:
+  replicas: 3 # Start with 3 replicas
+  selector:
+    matchLabels:
+      app: betting-engine
+  template:
+    metadata:
+      labels:
+        app: betting-engine
+    spec:
+      containers:
+        - name: backend
+          # Replace with your actual image path in a container registry
+          image: your-registry/real-time-betting-engine:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: NATS_URL
+              value: "nats://nats-service:4222" # Assuming a NATS service named 'nats-service'
+            - name: COCKROACHDB_URL
+              value: "postgresql://root@cockroachdb-public:26257/defaultdb?sslmode=disable"
+            - name: REDIS_URL
+              value: "redis-service:6379"
