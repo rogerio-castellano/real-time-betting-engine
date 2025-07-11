@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/websocket"
+	_ "github.com/lib/pq"
 	"github.com/nats-io/nats.go"
 )
 
@@ -33,17 +35,29 @@ type Bet struct {
 
 // Live statistics to be sent to the dashboard
 type LiveStats struct {
-	TotalBets     int     `json:"total_bets"`
-	BetsPerSecond float64 `json:"bets_per_second"`
-	TotalValue    float64 `json:"total_value"`
+	TotalBets              int     `json:"total_bets"`
+	BetsPerSecond          float64 `json:"bets_per_second"`
+	TotalValue             float64 `json:"total_value"`
+	DbFailures             int     `json:"db_failures"`
+	RedisFailures          int     `json:"redis_failures"`
+	DbFailuresPerSecond    float64 `json:"db_failures_per_second"`
+	RedisFailuresPerSecond float64 `json:"redis_failures_per_second"`
 }
 
 var stats = LiveStats{}
 var ctx = context.Background()
 
 func main() {
+	runInContainer := os.Getenv("REDIS_URL") != ""
 	// --- Connect to NATS JetStream ---
-	nc, err := nats.Connect("nats://localhost:4222")
+	var nc *nats.Conn
+	var err error
+	if runInContainer {
+		nc, err = nats.Connect("nats://host.docker.internal:4222")
+	} else {
+		nc, err = nats.Connect("nats://localhost:4222")
+	}
+
 	if err != nil {
 		log.Fatalf("Error connecting to NATS: %v", err)
 	}
@@ -51,26 +65,41 @@ func main() {
 	js, _ := nc.JetStream()
 
 	// --- Connect to CockroachDB ---
-	db, err := sql.Open("postgres", "postgresql://root@localhost:26257/defaultdb?sslmode=disable")
+	var db *sql.DB
+	if runInContainer {
+		dbURL := os.Getenv("COCKROACHDB_URL")
+		db, err = sql.Open("postgres", dbURL)
+	} else {
+		db, err = sql.Open("postgres", "postgresql://root@localhost:26257/defaultdb?sslmode=disable")
+	}
+
 	if err != nil {
 		log.Fatalf("Error connecting to CockroachDB: %v", err)
 	}
 	defer db.Close()
 
 	// --- Connect to Redis ---
-	rdb := redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
-	})
-
+	var rdb *redis.Client
+	if runInContainer {
+		rdb = redis.NewClient(&redis.Options{
+			Addr: os.Getenv("REDIS_URL"),
+		})
+	} else {
+		rdb = redis.NewClient(&redis.Options{
+			Addr: "localhost:6379",
+		})
+	}
 	// Subscribe to the "bets" stream
-	js.Subscribe("bets", func(msg *nats.Msg) {
+	js.QueueSubscribe("bets", "betting-engine-group", func(msg *nats.Msg) {
 		msg.Ack()
 		var bet Bet
 		if err := json.Unmarshal(msg.Data, &bet); err != nil {
 			log.Printf("Error unmarshaling bet: %v", err)
 			return
 		}
-
+		if time.Now().Nanosecond()%100000 == 0 {
+			log.Print(&bet)
+		}
 		// 1. Process and store the bet in CockroachDB
 		go storeBet(db, bet)
 
@@ -89,9 +118,15 @@ func main() {
 	ticker := time.NewTicker(1 * time.Second)
 	go func() {
 		var lastBetCount int
+		var lastDBFailuresCount int
+		var lastRedisFailuresCount int
 		for range ticker.C {
 			stats.BetsPerSecond = float64(stats.TotalBets - lastBetCount)
 			lastBetCount = stats.TotalBets
+			stats.DbFailuresPerSecond = float64(stats.DbFailures - lastDBFailuresCount)
+			lastDBFailuresCount = stats.DbFailures
+			stats.RedisFailuresPerSecond = float64(stats.RedisFailures - lastRedisFailuresCount)
+			lastRedisFailuresCount = stats.RedisFailures
 		}
 	}()
 
@@ -103,7 +138,8 @@ func storeBet(db *sql.DB, bet Bet) {
 	sqlStatement := `INSERT INTO bets (id, game_id, bet_type, amount, timestamp) VALUES ($1, $2, $3, $4, $5)`
 	_, err := db.Exec(sqlStatement, bet.ID, bet.GameID, bet.BetType, bet.Amount, bet.Timestamp)
 	if err != nil {
-		log.Printf("Error storing bet: %v", err)
+		// log.Printf("Error storing bet: %v", err)
+		stats.DbFailures++
 	}
 }
 
@@ -112,7 +148,8 @@ func updateOdds(rdb *redis.Client, gameID string) {
 	// For this showcase, we'll just increment a key.
 	err := rdb.Incr(ctx, fmt.Sprintf("game:%s:odds_updates", gameID)).Err()
 	if err != nil {
-		log.Printf("Error updating odds in Redis: %v", err)
+		// log.Printf("Error updating odds in Redis: %v", err)
+		stats.RedisFailures++
 	}
 }
 

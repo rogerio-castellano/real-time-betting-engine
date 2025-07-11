@@ -2,6 +2,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const totalBetsElem = document.getElementById("total-bets");
   const betsPerSecondElem = document.getElementById("bets-per-second");
   const totalValueElem = document.getElementById("total-value");
+  const dbFailuresPerSecondElem = document.getElementById("db-failures-per-second");
+  const redisFailuresPerSecondElem = document.getElementById("redis-failures-per-second");
+  const dbFailuresElem = document.getElementById("db-failures");
+  const redisFailuresElem = document.getElementById("redis-failures");
 
   const socket = new WebSocket("ws://localhost:8080/ws");
 
@@ -17,6 +21,10 @@ document.addEventListener("DOMContentLoaded", () => {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })}`;
+    dbFailuresPerSecondElem.textContent = stats.db_failures_per_second.toLocaleString();
+    redisFailuresPerSecondElem.textContent = stats.redis_failures_per_second.toLocaleString();
+    dbFailuresElem.textContent = stats.db_failures.toLocaleString();
+    redisFailuresElem.textContent = stats.redis_failures.toLocaleString();
   };
 
   socket.onclose = () => {
