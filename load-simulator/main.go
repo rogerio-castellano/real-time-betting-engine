@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"math/rand"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,11 +21,22 @@ type Bet struct {
 }
 
 func main() {
+	counter := 0
 	nc, err := nats.Connect("nats://localhost:4222") // Connect to NATS via port-forward
 	if err != nil {
 		log.Fatalf("Error connecting to NATS: %v", err)
 	}
 	defer nc.Close()
+
+	ms, _ := strconv.ParseInt(os.Args[1], 10, 64)
+	if ms == 0 {
+		ms = 10
+	}
+
+	bets, _ := strconv.Atoi(os.Args[2])
+	if bets == 0 {
+		ms = 10000
+	}
 
 	log.Println("Load simulator started...")
 	for {
@@ -38,6 +51,11 @@ func main() {
 		if err := nc.Publish("bets", betJSON); err != nil {
 			log.Printf("Error publishing bet: %v", err)
 		}
-		time.Sleep(10 * time.Millisecond) // Adjust for desired throughput
+		time.Sleep(time.Duration(ms) * time.Millisecond) // Adjust for desired throughput
+
+		counter++
+		if counter >= bets {
+			return
+		}
 	}
 }
