@@ -15,7 +15,9 @@ spec:
       containers:
         - name: backend
           # Replace with your actual image path in a container registry
-          image: your-registry/real-time-betting-engine:latest
+          image: real-time-betting-engine:latest
+          #
+          imagePullPolicy: Never
           ports:
             - containerPort: 8080
           env:
