@@ -1,22 +1,18 @@
 # Use the official Golang image
 FROM golang:1.24
+
 # Set the working directory
 WORKDIR /app
 
-# Copy go.mod and go.sum files
-COPY go.mod go.sum ./
+COPY backend/go.mod backend/go.sum ./
 
 # Download dependencies
 RUN go mod download
 
-# Copy the source code
-COPY . .
+COPY backend/main ./main
 
-# Build the Go app
-RUN go build -o ./main ./cmd
+RUN go build -o main .
 
-# Expose the port the app runs on
 EXPOSE 8080
 
-# Run the executable
 CMD ["./main"]
