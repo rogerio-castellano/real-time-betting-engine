@@ -59,7 +59,7 @@ func main() {
 	}
 
 	if err != nil {
-		log.Fatalf("Error connecting to NATS: %v", err)
+		log.Fatalf("Error connecting to NATS: %v.\nCheck if port forwarding is set up (kubectl port-forward svc/nats-service 4222:4222)", err)
 	}
 	defer nc.Close()
 	js, _ := nc.JetStream()
