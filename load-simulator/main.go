@@ -21,7 +21,6 @@ type Bet struct {
 }
 
 func main() {
-	counter := 0
 	nc, err := nats.Connect("nats://localhost:4222") // Connect to NATS via port-forward
 	if err != nil {
 		log.Fatalf("Error connecting to NATS: %v", err)
@@ -37,6 +36,7 @@ func main() {
 	if bets == 0 {
 		ms = 10000
 	}
+	counter := 0
 
 	log.Println("Load simulator started...")
 	for {
