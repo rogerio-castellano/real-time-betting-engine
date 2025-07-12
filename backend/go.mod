@@ -1,6 +1,6 @@
 module github.com/rogerio-castellano/real-time-betting-engine/backend
 
-go 1.24.4
+go 1.24
 
 require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
