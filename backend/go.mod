@@ -1,4 +1,4 @@
-module github.com/rogerio-castellano/real-time-betting-engine-gemini/backend
+module github.com/rogerio-castellano/real-time-betting-engine/backend
 
 go 1.24.4
 
