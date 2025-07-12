@@ -4,12 +4,12 @@ FROM golang:1.24
 # Set the working directory
 WORKDIR /app
 
-COPY backend/go.mod backend/go.sum ./
+COPY go.mod go.sum ./
 
 # Download dependencies
 RUN go mod download
 
-COPY backend/main ./main
+COPY . .
 
 RUN go build -o main .
 
