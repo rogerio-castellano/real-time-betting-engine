@@ -1,3 +1,5 @@
+default : k8sbuild
+
 build:
 	go build .
 

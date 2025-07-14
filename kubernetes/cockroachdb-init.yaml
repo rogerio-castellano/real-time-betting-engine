@@ -1,0 +1,17 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cockroach-init
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: init
+          image: cockroachdb/cockroach:v23.2.5
+          command:
+            - /bin/bash
+            - -ec
+            - |
+              echo "Initializing CockroachDB cluster..."
+              cockroach init --insecure --host=cockroachdb-0.cockroachdb
