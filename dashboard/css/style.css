@@ -1,0 +1,26 @@
+body {
+  font-family: "Segoe UI", "Roboto", "Helvetica Neue", sans-serif;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.875em;
+  font-weight: bold;
+  color: white;
+  margin-right: 8px;
+}
+
+.status-pill.success {
+  background-color: #28a745;
+}
+
+.status-pill.waiting {
+  background-color: #ffc107;
+  color: #333;
+}
+
+.status-pill.error {
+  background-color: #dc3545;
+}

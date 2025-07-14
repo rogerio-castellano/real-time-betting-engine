@@ -6,11 +6,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const redisFailuresPerSecondElem = document.getElementById("redis-failures-per-second");
   const dbFailuresElem = document.getElementById("db-failures");
   const redisFailuresElem = document.getElementById("redis-failures");
+  const connectionStatus = document.getElementsByClassName("status-pill")[0];
 
   const socket = new WebSocket("ws://localhost:8081/ws");
 
   socket.onopen = () => {
-    console.log("WebSocket connection established");
+    connectionStatus.textContent = "Connected";
+    connectionStatus.classList.remove("waiting");
+    connectionStatus.classList.add("success");
+    console.log("WebSocket connection established.");
   };
 
   socket.onmessage = (event) => {
@@ -28,10 +32,21 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   socket.onclose = () => {
+    connectionStatus.textContent = "Connection closed";
+    connectionStatus.classList.remove("waiting");
+    connectionStatus.classList.add("error");
     console.log("WebSocket connection closed");
   };
 
   socket.onerror = (error) => {
-    console.error("WebSocket error:", error);
+    connectionStatus.textContent = "Error";
+    connectionStatus.classList.remove("waiting");
+    connectionStatus.classList.add("error");
+
+    console.error(
+      "WebSocket error:",
+      error,
+      "\n\nCheck if port forwarding is set up (kubectl port-forward svc/nats-service 8081:8081)"
+    );
   };
 });
