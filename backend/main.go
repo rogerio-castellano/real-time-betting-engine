@@ -90,6 +90,14 @@ func main() {
 	})
 
 	http.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 		var count int
 		err := db.QueryRow("SELECT COUNT(*) FROM bets;").Scan(&count)
 		if err != nil {
