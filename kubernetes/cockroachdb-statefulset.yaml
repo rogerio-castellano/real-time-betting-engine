@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: cockroachdb
-          image: cockroachdb/cockroach:v23.1.9
+          image: cockroachdb/cockroach:latest-v23.2
           args:
             - "start"
             - "--insecure"

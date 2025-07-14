@@ -16,14 +16,13 @@ spec:
         - name: backend
           # Replace with your actual image path in a container registry
           image: real-time-betting-engine:latest
-          #
-          imagePullPolicy: Never
+          imagePullPolicy: Never # necessary for local images
           ports:
             - containerPort: 8080
           env:
             - name: NATS_URL
-              value: "nats://nats-service:4222" # Assuming a NATS service named 'nats-service'
+              value: "nats://host.docker.internal:4222" # Assuming a NATS service named 'nats-service'
             - name: COCKROACHDB_URL
-              value: "postgresql://root@cockroachdb-public:26257/defaultdb?sslmode=disable"
+              value: "postgresql://root@cockroachdb:26257/defaultdb?sslmode=disable"
             - name: REDIS_URL
               value: "redis-service:6379"
