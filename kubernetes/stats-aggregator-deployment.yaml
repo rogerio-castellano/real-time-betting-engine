@@ -1,0 +1,24 @@
+# kubernetes/stats-aggregator-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stats-aggregator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: stats-aggregator
+  template:
+    metadata:
+      labels:
+        app: stats-aggregator
+    spec:
+      containers:
+        - name: aggregator
+          image: stats-aggregator:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8081
+          env:
+            - name: NATS_URL
+              value: "nats://nats-service:4222"

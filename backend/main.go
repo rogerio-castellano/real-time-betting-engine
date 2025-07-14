@@ -11,18 +11,10 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/gorilla/websocket"
+	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 	"github.com/nats-io/nats.go"
 )
-
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all connections
-	},
-}
 
 // Represents a bet coming into the system
 type Bet struct {
@@ -33,30 +25,15 @@ type Bet struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
-// Live statistics to be sent to the dashboard
-type LiveStats struct {
-	TotalBets              int     `json:"total_bets"`
-	BetsPerSecond          float64 `json:"bets_per_second"`
-	TotalValue             float64 `json:"total_value"`
-	DbFailures             int     `json:"db_failures"`
-	RedisFailures          int     `json:"redis_failures"`
-	DbFailuresPerSecond    float64 `json:"db_failures_per_second"`
-	RedisFailuresPerSecond float64 `json:"redis_failures_per_second"`
-}
-
-var stats = LiveStats{}
+var stats = PodStats{}
 var ctx = context.Background()
+var podID = uuid.New().String()
 
 func main() {
-	runInContainer := os.Getenv("REDIS_URL") != ""
 	// --- Connect to NATS JetStream ---
 	var nc *nats.Conn
 	var err error
-	if runInContainer {
-		nc, err = nats.Connect("nats://host.docker.internal:4222")
-	} else {
-		nc, err = nats.Connect("nats://localhost:4222")
-	}
+	nc, err = nats.Connect(os.Getenv("NATS_URL"))
 
 	if err != nil {
 		log.Fatalf("Error connecting to NATS: %v.\nCheck if port forwarding is set up (kubectl port-forward svc/nats-service 4222:4222)", err)
@@ -66,29 +43,25 @@ func main() {
 
 	// --- Connect to CockroachDB ---
 	var db *sql.DB
-	if runInContainer {
-		dbURL := os.Getenv("COCKROACHDB_URL")
-		db, err = sql.Open("postgres", dbURL)
-	} else {
-		db, err = sql.Open("postgres", "postgresql://root@localhost:26257/defaultdb?sslmode=disable")
-	}
-
+	dbURL := os.Getenv("COCKROACHDB_URL")
+	db, err = sql.Open("postgres", dbURL)
 	if err != nil {
 		log.Fatalf("Error connecting to CockroachDB: %v", err)
 	}
 	defer db.Close()
 
-	// --- Connect to Redis ---
-	var rdb *redis.Client
-	if runInContainer {
-		rdb = redis.NewClient(&redis.Options{
-			Addr: os.Getenv("REDIS_URL"),
-		})
-	} else {
-		rdb = redis.NewClient(&redis.Options{
-			Addr: "localhost:6379",
-		})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err = db.PingContext(ctx)
+	if err != nil {
+		log.Fatalf("Ping failed: %v", err)
 	}
+
+	// --- Connect to Redis ---
+	rdb := redis.NewClient(&redis.Options{
+		Addr: os.Getenv("REDIS_URL"),
+	})
 	// Subscribe to the "bets" stream
 	js.QueueSubscribe("bets", "betting-engine-group", func(msg *nats.Msg) {
 		msg.Ack()
@@ -109,36 +82,34 @@ func main() {
 		// 3. Update live stats
 		stats.TotalBets++
 		stats.TotalValue += bet.Amount
+
+		// stats.PodID = os.Getenv("POD_NAME") // Or use hostname
+		stats.PodID = podID
+		statsJSON, _ := json.Marshal(stats)
+		nc.Publish("stats.update", statsJSON)
 	})
 
-	// --- WebSocket Handler for Live Stats ---
-	http.HandleFunc("/ws", handleWebSocket)
-
-	// Ticker to calculate bets per second
-	ticker := time.NewTicker(1 * time.Second)
-	go func() {
-		var lastBetCount int
-		var lastDBFailuresCount int
-		var lastRedisFailuresCount int
-		for range ticker.C {
-			stats.BetsPerSecond = float64(stats.TotalBets - lastBetCount)
-			lastBetCount = stats.TotalBets
-			stats.DbFailuresPerSecond = float64(stats.DbFailures - lastDBFailuresCount)
-			lastDBFailuresCount = stats.DbFailures
-			stats.RedisFailuresPerSecond = float64(stats.RedisFailures - lastRedisFailuresCount)
-			lastRedisFailuresCount = stats.RedisFailures
+	http.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
+		var count int
+		err := db.QueryRow("SELECT COUNT(*) FROM bets;").Scan(&count)
+		if err != nil {
+			log.Printf("DB query failed: %v", err) // Add this!
+			http.Error(w, "DB query failed", http.StatusInternalServerError)
+			return
 		}
-	}()
+
+		json.NewEncoder(w).Encode(map[string]int{"total_bets": count})
+	})
 
 	log.Println("Server started on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
 func storeBet(db *sql.DB, bet Bet) {
-	sqlStatement := `INSERT INTO bets (id, game_id, bet_type, amount, timestamp) VALUES ($1, $2, $3, $4, $5)`
-	_, err := db.Exec(sqlStatement, bet.ID, bet.GameID, bet.BetType, bet.Amount, bet.Timestamp)
+	sqlStatement := `INSERT INTO bets (id, game_id, bet_type, amount, timestamp, pod_id) VALUES ($1, $2, $3, $4, $5, $6)`
+	_, err := db.Exec(sqlStatement, bet.ID, bet.GameID, bet.BetType, bet.Amount, bet.Timestamp, podID)
 	if err != nil {
-		// log.Printf("Error storing bet: %v", err)
+		log.Printf("Error storing bet: (id:%v) - %v", bet.ID, err)
 		stats.DbFailures++
 	}
 }
@@ -150,23 +121,5 @@ func updateOdds(rdb *redis.Client, gameID string) {
 	if err != nil {
 		// log.Printf("Error updating odds in Redis: %v", err)
 		stats.RedisFailures++
-	}
-}
-
-func handleWebSocket(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	defer conn.Close()
-
-	// Push stats to the dashboard every second
-	for {
-		time.Sleep(1 * time.Second)
-		if err := conn.WriteJSON(stats); err != nil {
-			log.Println("WebSocket write error:", err)
-			break
-		}
 	}
 }

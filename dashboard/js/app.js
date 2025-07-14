@@ -7,7 +7,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const dbFailuresElem = document.getElementById("db-failures");
   const redisFailuresElem = document.getElementById("redis-failures");
 
-  const socket = new WebSocket("ws://localhost:8080/ws");
+  const socket = new WebSocket("ws://localhost:8081/ws");
 
   socket.onopen = () => {
     console.log("WebSocket connection established");
