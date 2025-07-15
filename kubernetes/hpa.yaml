@@ -12,7 +12,7 @@ spec:
   metrics:
     - type: Resource
       resource:
-        name: cpu
+        name: memory
         target:
-          type: Utilization
-          averageUtilization: 80 # Scale up when CPU usage hits 80%
+          type: AverageValue
+          averageValue: 25Mi
