@@ -1,6 +1,6 @@
 default: create
 
-c:
+c: create
 create:
 	kubectl apply -f ./kubernetes/redis-deployment.yaml
 	kubectl apply -f ./kubernetes/redis-service.yaml
@@ -58,7 +58,8 @@ hpa:
 	pause 10
 	kubectl apply -f ./kubernetes/hpa.yaml
 
-rs:
+
+rs: reset
 reset:
 	kubectl scale deployment stats-aggregator --replicas=0 && kubectl scale deployment betting-engine-backend --replicas=0
 	kubectl run pg-client \
@@ -71,5 +72,12 @@ reset:
 	-U postgres \
 	-d postgres \
 	-c "TRUNCATE TABLE bets;"
+	docker run --rm -it natsio/nats-box:latest nats -s nats://host.docker.internal:4222 stream purge bets_stream -f
+	docker run --rm -it natsio/nats-box:latest nats -s nats://host.docker.internal:4222 stream purge stats_stream -f
+	kubectl run redis-inspect \
+	--rm -it \
+	--image=redis:7-alpine \
+	--restart=Never \
+	--command -- redis-cli -h redis-service SET game:game_123:odds_updates 0
 	kubectl scale deployment stats-aggregator --replicas=1 && kubectl scale deployment betting-engine-backend --replicas=3
-
+	
