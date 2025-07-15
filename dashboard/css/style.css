@@ -96,3 +96,32 @@ body {
   color: #999;
   font-size: 0.85rem;
 }
+
+.status-pill.color1 {
+  background-color: green;
+  color: white;
+}
+.status-pill.color2 {
+  background-color: lime;
+  color: #121212;
+}
+.status-pill.color3 {
+  background-color: yellowgreen;
+  color: #121212;
+}
+.status-pill.color4 {
+  background-color: yellow;
+  color: #121212;
+}
+.status-pill.color5 {
+  background-color: orange;
+  color: #121212;
+}
+.status-pill.color6 {
+  background-color: tomato;
+  color: white;
+}
+.status-pill.color7 {
+  background-color: red;
+  color: white;
+}

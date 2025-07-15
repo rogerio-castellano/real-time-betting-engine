@@ -23,7 +23,29 @@ document.addEventListener("DOMContentLoaded", () => {
       .then((data) => {
         rowsCountElem.textContent = `Total Bets in the table: ${data.total_bets}`;
 
-        rowsCountElem.className = "status-pill " + (data.total_bets !== processedBetsCount ? "error" : "success");
+        const delta = (processedBetsCount - data.total_bets) / processedBetsCount;
+
+        const thresholds = [
+          { limit: 0.01, color: "color7" },
+          { limit: 0.008, color: "color6" },
+          { limit: 0.006, color: "color5" },
+          { limit: 0.004, color: "color4" },
+          { limit: 0.002, color: "color3" },
+          { limit: 0, color: "color2" },
+        ];
+
+        let color = "color1"; // default for exact match
+
+        for (const { limit, color: c } of thresholds) {
+          if (delta > limit) {
+            color = c;
+            console.log(limit, c);
+            break;
+          }
+        }
+
+        rowsCountElem.className = `status-pill ${color}`;
+        // rowsCountElem.className = "status-pill " + (data.total_bets !== processedBetsCount ? "error" : "success");
       })
       .catch((error) => {
         rowsCountElem.textContent = "Error (" + error + ") at " + formattedTime(new Date());
