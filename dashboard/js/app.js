@@ -13,7 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const socket = new WebSocket("ws://localhost:8081/ws");
   const refreshIntervalInSeconds = 15;
   let intervalId = -1;
-  let processedBetsCount = 0;
+  let ingestedBetsCount = 0;
 
   refreshIntervalElem.textContent = refreshIntervalInSeconds;
 
@@ -21,9 +21,10 @@ document.addEventListener("DOMContentLoaded", () => {
     fetch("http://localhost:8082/stats")
       .then((res) => res.json())
       .then((data) => {
-        rowsCountElem.textContent = `Total Bets in the table: ${data.total_bets}`;
+        betsTableRowCount = data.bets_table_row_count;
+        rowsCountElem.textContent = `Total Bets in the table: ${betsTableRowCount}`;
 
-        const delta = (processedBetsCount - data.total_bets) / processedBetsCount;
+        const errorsRate = (ingestedBetsCount - betsTableRowCount) / ingestedBetsCount;
 
         const thresholds = [
           { limit: 0.01, color: "color7" },
@@ -37,7 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
         let color = "color1"; // default for exact match
 
         for (const { limit, color: c } of thresholds) {
-          if (delta > limit) {
+          if (errorsRate > limit) {
             color = c;
             console.log(limit, c);
             break;
@@ -45,7 +46,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         rowsCountElem.className = `status-pill ${color}`;
-        // rowsCountElem.className = "status-pill " + (data.total_bets !== processedBetsCount ? "error" : "success");
       })
       .catch((error) => {
         rowsCountElem.textContent = "Error (" + error + ") at " + formattedTime(new Date());
@@ -71,7 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   socket.onmessage = (event) => {
     const stats = JSON.parse(event.data);
-    processedBetsCount = stats.total_bets;
+    ingestedBetsCount = stats.total_bets;
     totalBetsElem.textContent = stats.total_bets.toLocaleString();
     betsPerSecondElem.textContent = stats.bets_per_second.toFixed(0);
     totalValueElem.textContent = `$${stats.total_value.toLocaleString(undefined, {

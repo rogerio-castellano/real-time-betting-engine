@@ -121,7 +121,7 @@ func main() {
 			return
 		}
 
-		json.NewEncoder(w).Encode(map[string]int{"total_bets": count})
+		json.NewEncoder(w).Encode(map[string]int{"bets_table_row_count": count})
 	})
 
 	log.Println("Server started on :8082")
