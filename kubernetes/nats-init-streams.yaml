@@ -1,0 +1,48 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: init-nats-streams
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: wait-for-nats
+          image: busybox:1.28
+          command:
+            ["sh", "-c", 'until nc -z nats 4222; do echo "Waiting for NATS..."; sleep 2; done; echo "NATS is ready!"']
+      containers:
+        - name: nats-init
+          image: natsio/nats-box:latest
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -e
+              echo "Checking NATS connection..."
+              nats --server=nats://host.docker.internal:4222 server ping || exit 1
+
+              echo "Creating streams..."
+              if ! nats --server=nats://nats:4222 stream add bets_stream \
+                --subjects "bets" \
+                --storage memory \
+                --retention workq \
+                --max-msgs=1000000 \
+                --defaults; then
+                echo "Failed to create bets_stream"
+                exit 1
+              fi
+
+              if ! nats --server=nats://nats:4222 stream add stats_stream \
+                --subjects "stats.update" \
+                --storage memory \
+                --retention workq \
+                --max-msgs=1000000 \
+                --defaults; then
+                echo "Failed to create stats_stream"
+                exit 1
+              fi
+
+              echo "Verifying streams..."
+              nats --server=nats://nats:4222 stream ls
+              echo "Stream creation completed successfully!"
+      restartPolicy: Never
+  backoffLimit: 3
