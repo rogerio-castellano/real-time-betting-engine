@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"time"
@@ -28,6 +29,52 @@ type Bet struct {
 var stats = PodStats{}
 var ctx = context.Background()
 var podID = uuid.New().String()
+
+func storeBet(db *sql.DB, bet Bet) {
+	sqlStatement := `INSERT INTO bets (id, game_id, bet_type, amount, timestamp, pod_id) VALUES ($1, $2, $3, $4, $5, $6)`
+
+	err := retryWithBackoff(func() error {
+		_, err := db.Exec(sqlStatement, bet.ID, bet.GameID, bet.BetType, bet.Amount, bet.Timestamp, podID)
+		return err
+	}, 5, 1*time.Second)
+
+	// _, err := db.Exec(sqlStatement, bet.ID, bet.GameID, bet.BetType, bet.Amount, bet.Timestamp, podID)
+	if err != nil {
+		log.Printf("Error storing bet: (id:%v) - %v", bet.ID, err)
+		stats.DbFailures++
+	}
+}
+
+func updateOdds(rdb *redis.Client, gameID string) {
+	// In a real system, you'd have complex logic here.
+	// For this showcase, we'll just increment a key.
+	err := rdb.Incr(ctx, fmt.Sprintf("game:%s:odds_updates", gameID)).Err()
+	if err != nil {
+		// log.Printf("Error updating odds in Redis: %v", err)
+		stats.RedisFailures++
+	}
+}
+
+func retryWithBackoff(task func() error, maxRetries int, baseDelay time.Duration) error {
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		err := task()
+		if err == nil {
+			return nil
+		}
+
+		if attempt == maxRetries {
+			return fmt.Errorf("💥 all retries failed: %w", err)
+		}
+
+		jitter := time.Duration(rand.Intn(100)) * time.Millisecond
+		backoff := time.Duration(1<<attempt) * baseDelay
+		wait := backoff + jitter
+
+		fmt.Printf("🔁 Retry %d in %v...\n", attempt+1, wait)
+		time.Sleep(wait)
+	}
+	return nil
+}
 
 func main() {
 	// --- Connect to NATS JetStream ---
@@ -87,7 +134,7 @@ func main() {
 		if time.Now().Nanosecond()%100000 == 0 {
 			log.Print(&bet)
 		}
-		// 1. Process and store the bet in CockroachDB
+		// 1. Process and store the bet in the database
 		go storeBet(db, bet)
 
 		// 2. Update odds in Redis (example logic)
@@ -126,23 +173,4 @@ func main() {
 
 	log.Println("Server started on :8082")
 	log.Fatal(http.ListenAndServe(":8082", nil))
-}
-
-func storeBet(db *sql.DB, bet Bet) {
-	sqlStatement := `INSERT INTO bets (id, game_id, bet_type, amount, timestamp, pod_id) VALUES ($1, $2, $3, $4, $5, $6)`
-	_, err := db.Exec(sqlStatement, bet.ID, bet.GameID, bet.BetType, bet.Amount, bet.Timestamp, podID)
-	if err != nil {
-		log.Printf("Error storing bet: (id:%v) - %v", bet.ID, err)
-		stats.DbFailures++
-	}
-}
-
-func updateOdds(rdb *redis.Client, gameID string) {
-	// In a real system, you'd have complex logic here.
-	// For this showcase, we'll just increment a key.
-	err := rdb.Incr(ctx, fmt.Sprintf("game:%s:odds_updates", gameID)).Err()
-	if err != nil {
-		// log.Printf("Error updating odds in Redis: %v", err)
-		stats.RedisFailures++
-	}
 }
