@@ -2,51 +2,60 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-Time Betting Stats</title>
-    <link rel="stylesheet" href="css/style.css">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🎰 Real-Time Betting Dashboard</title>
+    <link rel="stylesheet" href="css/style.css" />
 </head>
 
 <body>
-    <div class="container">
-        <h1>🚀 Real-Time Sports Betting Engine</h1>
-        <span class="status-pill warning">Waiting connection...</span>
-        <div id="bets-table-row-count">Loading...</div>
-        <div class="stats">
-            <div class="stat-card">
-                <h2>Total Bets Processed</h2>
+    <header class="header">
+        <h1><span class="logo">🎯</span> Real-Time Betting Engine</h1>
+        <span class="status-pill waiting">Connecting...</span>
+    </header>
+
+    <main class="dashboard">
+        <section class="summary">
+            <p id="bets-table-row-count" class="summary-pill">Loading bets...</p>
+        </section>
+
+        <section class="stats-grid">
+            <div class="card highlight">
+                <h2>Total Bets</h2>
                 <p id="total-bets">0</p>
             </div>
-            <div class="stat-card">
+            <div class="card">
                 <h2>Bets Per Second</h2>
                 <p id="bets-per-second">0</p>
             </div>
-            <div class="stat-card">
+            <div class="card">
                 <h2>Total Bet Value</h2>
                 <p id="total-value">$0.00</p>
             </div>
-            <hr>
-            <div class="stat-card">
-                <h2>DB failures per second</h2>
+            <div class="card warning">
+                <h2>DB Failures/sec</h2>
                 <p id="db-failures-per-second">0</p>
             </div>
-            <div class="stat-card">
-                <h2>Redis failures per second</h2>
+            <div class="card warning">
+                <h2>Redis Failures/sec</h2>
                 <p id="redis-failures-per-second">0</p>
             </div>
-            <hr>
-            <div class="stat-card">
-                <h2>DB failures</h2>
+            <div class="card error">
+                <h2>DB Failures</h2>
                 <p id="db-failures">0</p>
             </div>
-            <div class="stat-card">
-                <h2>Redis failures</h2>
+            <div class="card error">
+                <h2>Redis Failures</h2>
                 <p id="redis-failures">0</p>
             </div>
-        </div>
-    </div>
-    <script src="js/app.js"></script>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>📊 Live statistics powered by WebSocket | Updated every <span id="refresh-interval">5</span> seconds</p>
+    </footer>
+
+    <script src=" js/app.js"></script>
 </body>
 
 </html>

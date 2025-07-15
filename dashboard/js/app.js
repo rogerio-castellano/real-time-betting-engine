@@ -8,11 +8,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const redisFailuresElem = document.getElementById("redis-failures");
   const connectionStatus = document.getElementsByClassName("status-pill")[0];
   const rowsCountElem = document.getElementById("bets-table-row-count");
+  const refreshIntervalElem = document.getElementById("refresh-interval");
 
   const socket = new WebSocket("ws://localhost:8081/ws");
-
+  const refreshIntervalInSeconds = 15;
   let intervalId = -1;
   let processedBetsCount = 0;
+
+  refreshIntervalElem.textContent = refreshIntervalInSeconds;
 
   function showTableRowsCount() {
     fetch("http://localhost:8082/stats")
@@ -41,7 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
     connectionStatus.classList.add("success");
     console.log("WebSocket connection established.");
     showTableRowsCount();
-    intervalId = setInterval(showTableRowsCount, 15000);
+    intervalId = setInterval(showTableRowsCount, refreshIntervalInSeconds * 1000);
   };
 
   socket.onmessage = (event) => {
