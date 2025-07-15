@@ -41,7 +41,8 @@ create:
 	kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 	kubectl patch deployment metrics-server -n kube-system --type=json -p "$$(cat metrics-patch.json)"
 	kubectl rollout restart deployment metrics-server -n kube-system
-	kubectl wait --for=condition=ready pod -l app=metrics-server --timeout=30s
+	kubectl wait --namespace kube-system --for=condition=Available deployment/metrics-server --timeout=120s
+	sleep 10
 	kubectl get apiservices | grep metrics
 	kubectl top pods
 
@@ -71,5 +72,4 @@ reset:
 	-d postgres \
 	-c "TRUNCATE TABLE bets;"
 	kubectl scale deployment stats-aggregator --replicas=1 && kubectl scale deployment betting-engine-backend --replicas=3
-
 
