@@ -12,17 +12,18 @@ document.addEventListener("DOMContentLoaded", () => {
   const socket = new WebSocket("ws://localhost:8081/ws");
 
   let intervalId = -1;
+  let processedBetsCount = 0;
 
   function showTableRowsCount() {
-    fetch("http://localhost:8080/stats")
+    fetch("http://localhost:8082/stats")
       .then((res) => res.json())
       .then((data) => {
         rowsCountElem.textContent = `Total Bets in the table: ${data.total_bets}`;
 
-        rowsCountElem.className =
-          "status-pill " + (data.total_bets === 0 ? "error" : data.total_bets < 10 ? "warning" : "success");
+        rowsCountElem.className = "status-pill " + (data.total_bets !== processedBetsCount ? "error" : "success");
       })
       .catch((error) => {
+        rowsCountElem.textContent = "Error (" + error + ") at " + formattedTime(new Date());
         console.log("Fetch error:", error);
       });
   }
@@ -40,11 +41,12 @@ document.addEventListener("DOMContentLoaded", () => {
     connectionStatus.classList.add("success");
     console.log("WebSocket connection established.");
     showTableRowsCount();
-    intervalId = setInterval(showTableRowsCount, 30000);
+    intervalId = setInterval(showTableRowsCount, 15000);
   };
 
   socket.onmessage = (event) => {
     const stats = JSON.parse(event.data);
+    processedBetsCount = stats.total_bets;
     totalBetsElem.textContent = stats.total_bets.toLocaleString();
     betsPerSecondElem.textContent = stats.bets_per_second.toFixed(0);
     totalValueElem.textContent = `$${stats.total_value.toLocaleString(undefined, {
@@ -70,11 +72,15 @@ document.addEventListener("DOMContentLoaded", () => {
     connectionStatus.classList.remove("waiting");
     connectionStatus.classList.add("error");
 
-    console.error(
-      "WebSocket error:",
-      error,
-      "\n\nCheck if port forwarding is set up (kubectl port-forward svc/nats-service 8081:8081)"
-    );
+    console.error("WebSocket error:", error, "\n\nCheck if the service stats-aggregator is available");
     stopShowTableRowsCount();
   };
 });
+
+function formattedTime(date) {
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+
+  return `${hours}:${minutes}:${seconds}`;
+}

@@ -33,6 +33,7 @@ func main() {
 	// --- Connect to NATS JetStream ---
 	var nc *nats.Conn
 	var err error
+	log.Println("Connecting to NATS...")
 	nc, err = nats.Connect(os.Getenv("NATS_URL"))
 
 	if err != nil {
@@ -41,27 +42,40 @@ func main() {
 	defer nc.Close()
 	js, _ := nc.JetStream()
 
-	// --- Connect to CockroachDB ---
+	// --- Connect to Postgres ---
 	var db *sql.DB
-	dbURL := os.Getenv("COCKROACHDB_URL")
+	dbURL := os.Getenv("POSTGRES_URL")
+	log.Println(dbURL)
+	log.Println("Connecting to Postgres...")
 	db, err = sql.Open("postgres", dbURL)
 	if err != nil {
-		log.Fatalf("Error connecting to CockroachDB: %v", err)
+		log.Fatalf("sql.Open failed: %v", err)
 	}
-	defer db.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	err = db.PingContext(ctx)
+	log.Println("Calling db.PingContext...")
+	for i := range 5 {
+		start := time.Now()
+		err = db.PingContext(ctx)
+		log.Printf("Ping duration: %v", time.Since(start))
+		if err == nil {
+			break
+		}
+		log.Printf("Ping attempt %d failed: %v", i+1, err)
+		time.Sleep(2 * time.Second)
+	}
 	if err != nil {
-		log.Fatalf("Ping failed: %v", err)
+		log.Fatalf("Ping failed after retries: %v", err)
 	}
 
 	// --- Connect to Redis ---
+	log.Println("Connecting to Redis...")
 	rdb := redis.NewClient(&redis.Options{
 		Addr: os.Getenv("REDIS_URL"),
 	})
+
 	// Subscribe to the "bets" stream
 	js.QueueSubscribe("bets", "betting-engine-group", func(msg *nats.Msg) {
 		msg.Ack()
@@ -98,6 +112,7 @@ func main() {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
+
 		var count int
 		err := db.QueryRow("SELECT COUNT(*) FROM bets;").Scan(&count)
 		if err != nil {
@@ -109,8 +124,8 @@ func main() {
 		json.NewEncoder(w).Encode(map[string]int{"total_bets": count})
 	})
 
-	log.Println("Server started on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Println("Server started on :8082")
+	log.Fatal(http.ListenAndServe(":8082", nil))
 }
 
 func storeBet(db *sql.DB, bet Bet) {

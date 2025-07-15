@@ -7,6 +7,6 @@ spec:
     app: betting-engine
   ports:
     - protocol: TCP
-      port: 8080
-      targetPort: 8080
+      port: 8082
+      targetPort: 8082
   type: LoadBalancer # Exposes the service outside the cluster
