@@ -12,12 +12,77 @@ document.addEventListener("DOMContentLoaded", () => {
   const rowsCountElem = document.getElementById("bets-table-row-count");
   const refreshIntervalElem = document.getElementById("refresh-interval");
 
-  const socket = new WebSocket("ws://localhost:8081/ws");
   const refreshIntervalInSeconds = 15;
+  const reconnectIntervalInSeconds = 15;
+  const maxRetries = 5;
+  let retryCount = 0;
   let intervalId = -1;
   let ingestedBetsCount = 0;
 
   refreshIntervalElem.textContent = refreshIntervalInSeconds;
+
+  connectSocket();
+
+  function connectSocket() {
+    const socket = new WebSocket("ws://localhost:8081/ws");
+
+    if (retryCount >= maxRetries) {
+      console.error(`❌ Max retries (${maxRetries}) reached. Giving up.`);
+      connectionStatus.textContent = `❌ Max retries (${maxRetries}) reached.`;
+      return;
+    }
+
+    socket.onopen = () => {
+      connectionStatus.textContent = "Connected";
+      connectionStatus.classList.remove("waiting");
+      connectionStatus.classList.add("success");
+      console.log("✅ WebSocket connection established.");
+      retryCount = 0; // reset on success
+
+      showTableRowsCount();
+      intervalId = setInterval(showTableRowsCount, refreshIntervalInSeconds * 1000);
+    };
+
+    socket.onmessage = (event) => {
+      const stats = JSON.parse(event.data);
+      ingestedBetsCount = stats.total_bets;
+      totalBetsElem.textContent = stats.total_bets.toLocaleString();
+      betsPerSecondElem.textContent = stats.bets_per_second.toFixed(0);
+      totalValueElem.textContent = `$${stats.total_value.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`;
+      dbFailuresPerSecondElem.textContent = stats.db_failures_per_second.toLocaleString();
+      redisFailuresPerSecondElem.textContent = stats.redis_failures_per_second.toLocaleString();
+      dbFailuresElem.textContent = stats.db_failures.toLocaleString();
+      redisFailuresElem.textContent = stats.redis_failures.toLocaleString();
+    };
+
+    socket.onclose = () => {
+      connectionStatus.textContent = "Connection closed";
+      connectionStatus.classList.remove("waiting");
+      connectionStatus.classList.add("error");
+      console.log("WebSocket connection closed");
+      stopShowTableRowsCount();
+
+      retryCount++;
+      console.warn(`⚠️ Connection lost. Retry ${retryCount} of ${maxRetries} in ${reconnectIntervalInSeconds}s...`);
+      connectionStatus.classList.value = "status-pill";
+      connectionStatus.classList.add("waiting");
+      connectionStatus.textContent = "Retrying...";
+      setTimeout(connectSocket, reconnectIntervalInSeconds * 1000);
+    };
+
+    socket.onerror = (error) => {
+      connectionStatus.textContent = "Error";
+      connectionStatus.classList.remove("waiting");
+      connectionStatus.classList.add("error");
+
+      console.error("WebSocket error:", error, "\n\nCheck if the service stats-aggregator is available");
+      stopShowTableRowsCount();
+      socket.close();
+    };
+  }
 
   function showTableRowsCount() {
     fetch("http://localhost:8082/stats")
@@ -62,47 +127,6 @@ document.addEventListener("DOMContentLoaded", () => {
       rowsCountElem.textContent = "CONNECTION DISABLED";
     }
   }
-
-  socket.onopen = () => {
-    connectionStatus.textContent = "Connected";
-    connectionStatus.classList.remove("waiting");
-    connectionStatus.classList.add("success");
-    console.log("WebSocket connection established.");
-    showTableRowsCount();
-    intervalId = setInterval(showTableRowsCount, refreshIntervalInSeconds * 1000);
-  };
-
-  socket.onmessage = (event) => {
-    const stats = JSON.parse(event.data);
-    ingestedBetsCount = stats.total_bets;
-    totalBetsElem.textContent = stats.total_bets.toLocaleString();
-    betsPerSecondElem.textContent = stats.bets_per_second.toFixed(0);
-    totalValueElem.textContent = `$${stats.total_value.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-    dbFailuresPerSecondElem.textContent = stats.db_failures_per_second.toLocaleString();
-    redisFailuresPerSecondElem.textContent = stats.redis_failures_per_second.toLocaleString();
-    dbFailuresElem.textContent = stats.db_failures.toLocaleString();
-    redisFailuresElem.textContent = stats.redis_failures.toLocaleString();
-  };
-
-  socket.onclose = () => {
-    connectionStatus.textContent = "Connection closed";
-    connectionStatus.classList.remove("waiting");
-    connectionStatus.classList.add("error");
-    console.log("WebSocket connection closed");
-    stopShowTableRowsCount();
-  };
-
-  socket.onerror = (error) => {
-    connectionStatus.textContent = "Error";
-    connectionStatus.classList.remove("waiting");
-    connectionStatus.classList.add("error");
-
-    console.error("WebSocket error:", error, "\n\nCheck if the service stats-aggregator is available");
-    stopShowTableRowsCount();
-  };
 });
 
 function formattedTime(date) {
