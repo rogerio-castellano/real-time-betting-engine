@@ -1,6 +1,6 @@
 package main
 
-type PodStats struct {
+type LoadSnapshot struct {
 	PodID                  string  `json:"pod_id"`
 	TotalBets              int     `json:"total_bets"`
 	TotalValue             float64 `json:"total_value"`

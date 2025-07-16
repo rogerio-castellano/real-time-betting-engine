@@ -6,6 +6,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const redisFailuresPerSecondElem = document.getElementById("redis-failures-per-second");
   const dbFailuresElem = document.getElementById("db-failures");
   const redisFailuresElem = document.getElementById("redis-failures");
+  const totalOddsElem = document.getElementById("total-odds");
+  const pendingBetsElem = document.getElementById("pending-bets");
   const connectionStatus = document.getElementsByClassName("status-pill")[0];
   const rowsCountElem = document.getElementById("bets-table-row-count");
   const refreshIntervalElem = document.getElementById("refresh-interval");
@@ -40,12 +42,13 @@ document.addEventListener("DOMContentLoaded", () => {
         for (const { limit, color: c } of thresholds) {
           if (errorsRate > limit) {
             color = c;
-            console.log(limit, c);
             break;
           }
         }
 
         rowsCountElem.className = `status-pill ${color}`;
+        totalOddsElem.textContent = data.total_odds.toLocaleString();
+        pendingBetsElem.textContent = data.pending_bets.toLocaleString();
       })
       .catch((error) => {
         rowsCountElem.textContent = "Error (" + error + ") at " + formattedTime(new Date());

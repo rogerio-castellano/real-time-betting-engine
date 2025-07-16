@@ -26,7 +26,7 @@ type Bet struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
-var stats = PodStats{}
+var stats = LoadSnapshot{}
 var ctx = context.Background()
 var podID = uuid.New().String()
 
@@ -76,27 +76,36 @@ func retryWithBackoff(task func() error, maxRetries int, baseDelay time.Duration
 	return nil
 }
 
-func main() {
-	// --- Connect to NATS JetStream ---
-	var nc *nats.Conn
-	var err error
+func connectJetStream() (*nats.Conn, nats.JetStreamContext, func(), error) {
 	log.Println("Connecting to NATS...")
-	nc, err = nats.Connect(os.Getenv("NATS_URL"))
 
+	nc, err := nats.Connect(os.Getenv("NATS_URL"))
 	if err != nil {
-		log.Fatalf("Error connecting to NATS: %v.\nCheck if port forwarding is set up (kubectl port-forward svc/nats-service 4222:4222)", err)
+		return nil, nil, nil, err
 	}
-	defer nc.Close()
-	js, _ := nc.JetStream()
 
-	// --- Connect to Postgres ---
+	cleanup := func() {
+		nc.Close()
+	}
+
+	js, err := nc.JetStream()
+	if err != nil {
+		cleanup()
+		return nil, nil, nil, err
+	}
+
+	return nc, js, cleanup, nil
+}
+
+func dbConnection() (*sql.DB, error) {
 	var db *sql.DB
+
 	dbURL := os.Getenv("POSTGRES_URL")
 	log.Println(dbURL)
 	log.Println("Connecting to Postgres...")
-	db, err = sql.Open("postgres", dbURL)
+	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
-		log.Fatalf("sql.Open failed: %v", err)
+		return nil, fmt.Errorf("sql.Open failed: %v", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -114,14 +123,91 @@ func main() {
 		time.Sleep(2 * time.Second)
 	}
 	if err != nil {
-		log.Fatalf("Ping failed after retries: %v", err)
+		return nil, fmt.Errorf("ping failed after retries: %v", err)
 	}
 
-	// --- Connect to Redis ---
+	return db, nil
+}
+
+func redisConnection() *redis.Client {
 	log.Println("Connecting to Redis...")
 	rdb := redis.NewClient(&redis.Options{
 		Addr: os.Getenv("REDIS_URL"),
 	})
+
+	return rdb
+}
+
+var dbStats *sql.DB
+var jsStats nats.JetStreamContext
+var rdbStats *redis.Client
+
+func statsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	var count int
+	err := dbStats.QueryRow("SELECT COUNT(*) FROM bets;").Scan(&count)
+	if err != nil {
+		log.Printf("DB query failed: %v", err)
+		http.Error(w, "DB query failed", http.StatusInternalServerError)
+		return
+	}
+
+	stream, err := jsStats.StreamInfo("bets_stream")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	pendingBets := int(stream.State.Msgs)
+
+	gameID := "game_123"
+	redisCount, err := rdbStats.Get(ctx, fmt.Sprintf("game:%s:odds_updates", gameID)).Int()
+	if err != nil {
+		// log.Printf("Error updating odds in Redis: %v", err)
+		stats.RedisFailures++
+	}
+
+	json.NewEncoder(w).Encode(map[string]int{"bets_table_row_count": count,
+		"total_odds":   redisCount,
+		"pending_bets": pendingBets})
+}
+
+func main() {
+	nc, js, closeNATS, err := connectJetStream()
+	if err != nil {
+		log.Fatalf("Error connecting to NATS: %v.\nCheck if port forwarding is set up (kubectl port-forward svc/nats-service 4222:4222)", err)
+	}
+	defer closeNATS()
+
+	_, jsLocalStats, closeNATSStats, err := connectJetStream()
+	if err != nil {
+		log.Fatalf("Error connecting to NATS: %v.\nCheck if port forwarding is set up (kubectl port-forward svc/nats-service 4222:4222)", err)
+	}
+	defer closeNATSStats()
+	jsStats = jsLocalStats
+
+	// --- Connect to Postgres ---
+	db, err := dbConnection()
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	dbLocalStats, err := dbConnection()
+	if err != nil {
+		log.Fatalln(err)
+	}
+	dbStats = dbLocalStats
+
+	// --- Connect to Redis ---
+	rdb := redisConnection()
+	rdbStats = redisConnection()
 
 	// Subscribe to the "bets" stream
 	js.QueueSubscribe("bets", "betting-engine-group", func(msg *nats.Msg) {
@@ -150,26 +236,7 @@ func main() {
 		nc.Publish("stats.update", statsJSON)
 	})
 
-	http.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-
-		var count int
-		err := db.QueryRow("SELECT COUNT(*) FROM bets;").Scan(&count)
-		if err != nil {
-			log.Printf("DB query failed: %v", err) // Add this!
-			http.Error(w, "DB query failed", http.StatusInternalServerError)
-			return
-		}
-
-		json.NewEncoder(w).Encode(map[string]int{"bets_table_row_count": count})
-	})
+	http.HandleFunc("/stats", statsHandler)
 
 	log.Println("Server started on :8082")
 	log.Fatal(http.ListenAndServe(":8082", nil))
