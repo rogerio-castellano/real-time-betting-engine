@@ -12,7 +12,11 @@
     <header class="header">
         <h1><span class="logo">🎯</span> Real-Time Betting Engine</h1>
         <span class="status-pill waiting">Connecting...</span>
+        <button id="reconnectBtn" class="pill-button" style="display: none;">Reconnect</button>
     </header>
+    <div id="statusBanner" style="display: none; color: red; font-weight: bold; margin: 10px 0;">
+        🔌 Disconnected — Retry limit reached
+    </div>
 
     <main class="dashboard">
         <section class="summary">

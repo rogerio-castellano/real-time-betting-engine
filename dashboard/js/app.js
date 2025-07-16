@@ -11,6 +11,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const connectionStatus = document.getElementsByClassName("status-pill")[0];
   const rowsCountElem = document.getElementById("bets-table-row-count");
   const refreshIntervalElem = document.getElementById("refresh-interval");
+  const statusBannerElem = document.getElementById("statusBanner");
+  const reconnectBtnElem = document.getElementById("reconnectBtn");
 
   const refreshIntervalInSeconds = 15;
   const reconnectIntervalInSeconds = 15;
@@ -28,7 +30,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (retryCount >= maxRetries) {
       console.error(`❌ Max retries (${maxRetries}) reached. Giving up.`);
-      connectionStatus.textContent = `❌ Max retries (${maxRetries}) reached.`;
+      showReconnectButton();
       return;
     }
 
@@ -37,8 +39,8 @@ document.addEventListener("DOMContentLoaded", () => {
       connectionStatus.classList.remove("waiting");
       connectionStatus.classList.add("success");
       console.log("✅ WebSocket connection established.");
-      retryCount = 0; // reset on success
-
+      retryCount = 0;
+      hideReconnectButton();
       showTableRowsCount();
       intervalId = setInterval(showTableRowsCount, refreshIntervalInSeconds * 1000);
     };
@@ -82,6 +84,24 @@ document.addEventListener("DOMContentLoaded", () => {
       stopShowTableRowsCount();
       socket.close();
     };
+
+    reconnectBtnElem.addEventListener("click", () => {
+      retryCount = 0;
+      hideReconnectButton();
+      connectSocket();
+    });
+
+    function showReconnectButton() {
+      reconnectBtnElem.style.display = reconnectBtnElem.style.display = "block";
+      statusBannerElem.style.display = statusBannerElem.style.display = "block";
+      connectionStatus.style.display = connectionStatus.style.display = "none";
+    }
+
+    function hideReconnectButton() {
+      reconnectBtnElem.style.display = reconnectBtnElem.style.display = "none";
+      statusBannerElem.style.display = statusBannerElem.style.display = "none";
+      connectionStatus.style.display = connectionStatus.style.display = "block";
+    }
   }
 
   function showTableRowsCount() {
