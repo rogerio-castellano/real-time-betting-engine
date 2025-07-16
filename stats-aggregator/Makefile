@@ -3,7 +3,7 @@ default : k8sbuild
 build:
 	go build .
 
-k:
+k:k8sbuild
 k8sbuild:
 	docker build -t stats-aggregator .
 	kubectl scale deployment stats-aggregator --replicas=0

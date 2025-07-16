@@ -1,10 +1,10 @@
 default : k8sbuild
 
+b:build
 build:
-b:
 	go build .
 
-k:
+k:k8sbuild
 k8sbuild:
 	docker build -t real-time-betting-engine .
 	kubectl scale deployment betting-engine-backend --replicas=0
