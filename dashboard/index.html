@@ -11,7 +11,7 @@
 <body>
     <header class="header">
         <h1><span class="logo">🎯</span> Real-Time Betting Engine</h1>
-        <span class="status-pill waiting">Connecting...</span>
+        <span id="connection-status" class="status-pill waiting">Connecting...</span>
         <button id="reconnectBtn" class="pill-button" style="display: none;">Reconnect</button>
     </header>
     <div id="statusBanner" style="display: none; color: red; font-weight: bold; margin: 10px 0;">
@@ -19,10 +19,7 @@
     </div>
 
     <main class="dashboard">
-        <section class="summary">
-            <p id="bets-table-row-count" class="summary-pill">Loading bets...</p>
-        </section>
-
+        <h2 class="section-header">Betting Performance Overview</h2>
         <section class="stats-grid">
             <div class="card highlight">
                 <h2>Total Bets</h2>
@@ -35,6 +32,21 @@
             <div class="card">
                 <h2>Total Bet Value</h2>
                 <p id="total-value">$0.00</p>
+            </div>
+            <div class="card count">
+                <h2>Total Odds</h2>
+                <p id="total-odds">0</p>
+            </div>
+        </section>
+        <h2 class="alert-header">Recent Database Stats</h2>
+        <section class="stats-grid">
+            <div class="card count">
+                <h2>Bets table rows count</h2>
+                <p id="bets-table-row-count">0</p>
+            </div>
+            <div class="card count">
+                <h2>Pending bets</h2>
+                <p id="pending-bets">0</p>
             </div>
             <div class="card warning">
                 <h2>DB Failures/sec</h2>
@@ -52,15 +64,11 @@
                 <h2>Redis Failures</h2>
                 <p id="redis-failures">0</p>
             </div>
-            <div class="card count">
-                <h2>Total Odds</h2>
-                <p id="total-odds">0</p>
-            </div>
-            <div class="card count">
-                <h2>Pending bets</h2>
-                <p id="pending-bets">0</p>
-            </div>
         </section>
+
+        <!-- <section class="summary">
+                    <p id="bets-table-row-count" class="summary-pill">Loading bets...</p>
+                </section> -->
     </main>
 
     <footer class="footer">

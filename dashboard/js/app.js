@@ -8,7 +8,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const redisFailuresElem = document.getElementById("redis-failures");
   const totalOddsElem = document.getElementById("total-odds");
   const pendingBetsElem = document.getElementById("pending-bets");
-  const connectionStatus = document.getElementsByClassName("status-pill")[0];
+  const connectionStatus = document.getElementById("connection-status");
   const rowsCountElem = document.getElementById("bets-table-row-count");
   const refreshIntervalElem = document.getElementById("refresh-interval");
   const statusBannerElem = document.getElementById("statusBanner");
@@ -109,7 +109,7 @@ document.addEventListener("DOMContentLoaded", () => {
       .then((res) => res.json())
       .then((data) => {
         betsTableRowCount = data.bets_table_row_count;
-        rowsCountElem.textContent = `Total Bets in the table: ${betsTableRowCount}`;
+        rowsCountElem.textContent = betsTableRowCount;
 
         const errorsRate = (ingestedBetsCount - betsTableRowCount) / ingestedBetsCount;
 
@@ -131,7 +131,17 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
 
-        rowsCountElem.className = `status-pill ${color}`;
+        const cardClasses = rowsCountElem.parentElement.classList;
+
+        if (cardClasses > 2) {
+          card.classList.forEach((element) => {
+            if (element.IndexOf("color") != -1) {
+              cardClasses.remove(element);
+            }
+          });
+        }
+
+        cardClasses.add(color);
         totalOddsElem.textContent = data.total_odds.toLocaleString();
         pendingBetsElem.textContent = data.pending_bets.toLocaleString();
       })

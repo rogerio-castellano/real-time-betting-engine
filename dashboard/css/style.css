@@ -117,31 +117,56 @@ body {
   font-size: 0.85rem;
 }
 
-.status-pill.color1 {
-  background-color: green;
-  color: white;
+.card.color1 {
+  border-top: 4px solid green;
+  border-right: 4px solid green;
+  border-bottom: 4px solid green;
 }
-.status-pill.color2 {
-  background-color: lime;
-  color: #121212;
+.card.color2 {
+  border-top: 4px solid lime;
+  border-right: 4px solid lime;
+  border-bottom: 4px solid lime;
 }
-.status-pill.color3 {
-  background-color: yellowgreen;
-  color: #121212;
+.card.color3 {
+  border-top: 4px solid yellowgreen;
+  border-right: 4px solid yellowgreen;
+  border-bottom: 4px solid yellowgreen;
 }
-.status-pill.color4 {
-  background-color: yellow;
-  color: #121212;
+.card.color4 {
+  border-top: 4px solid yellow;
+  border-right: 4px solid yellow;
+  border-bottom: 4px solid yellow;
 }
-.status-pill.color5 {
-  background-color: orange;
-  color: #121212;
+.card.color5 {
+  border-top: 4px solid orange;
+  border-right: 4px solid orange;
+  border-bottom: 4px solid orange;
 }
-.status-pill.color6 {
-  background-color: tomato;
-  color: white;
+.card.color6 {
+  border-top: 4px solid tomato;
+  border-right: 4px solid tomato;
+  border-bottom: 4px solid tomato;
 }
-.status-pill.color7 {
-  background-color: red;
-  color: white;
+.card.color7 {
+  border-top: 4px solid red;
+  border-right: 4px solid red;
+  border-bottom: 4px solid red;
+}
+
+h2.section-header {
+  font-size: 1.75rem;
+  margin: 2rem 0 1rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 2px solid #00e676;
+  color: #00e676;
+}
+
+h2.alert-header {
+  font-size: 1.5rem;
+  margin-top: 2rem;
+  color: #ff4d4f;
+  background-color: #1e1e1e;
+  padding: 0.5rem 1rem;
+  border-left: 6px solid #dc3545;
+  border-radius: 8px;
 }
