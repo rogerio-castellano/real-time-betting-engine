@@ -82,3 +82,7 @@ reset:
 	--command -- redis-cli -h redis-service SET game:game_123:odds_updates 0
 	kubectl scale deployment stats-aggregator --replicas=1 && kubectl scale deployment betting-engine-backend --replicas=3
 	
+s: sync
+sync:
+	git pull
+	git push
