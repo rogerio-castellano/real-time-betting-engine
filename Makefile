@@ -37,6 +37,7 @@ create:
 	kubectl apply -f ./kubernetes/backend-deployment.yaml
 	kubectl wait --for=condition=ready pod -l app=betting-engine --timeout=30s
 	kubectl apply -f ./kubernetes/backend-service.yaml
+	kubectl apply -f ./kubernetes/backend-pprof-service.yaml
 
 	# The Metrics Server is a required dependency for enabling Horizontal Pod Autoscaler (HPA)
 	kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml

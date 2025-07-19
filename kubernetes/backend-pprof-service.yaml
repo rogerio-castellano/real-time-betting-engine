@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: betting-engine-pprof
+spec:
+  selector:
+    app: betting-engine
+  ports:
+    - name: pprof
+      port: 6060
+      targetPort: 6060
+  type: ClusterIP

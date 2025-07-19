@@ -11,6 +11,8 @@ import (
 	"os"
 	"time"
 
+	_ "net/http/pprof"
+
 	"github.com/go-redis/redis/v8"
 	_ "github.com/lib/pq"
 	"github.com/nats-io/nats.go"
@@ -233,6 +235,11 @@ func main() {
 	})
 
 	http.HandleFunc("/stats", statsHandler)
+
+	if os.Getenv("PROFILER") != "" {
+		log.Println("Running Profiler")
+		go http.ListenAndServe(":6060", nil)
+	}
 
 	log.Println("Server started on :8081")
 	log.Fatal(http.ListenAndServe(":8081", nil))

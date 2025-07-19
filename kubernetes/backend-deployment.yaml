@@ -28,3 +28,5 @@ spec:
               value: "redis-service:6379"
             - name: POSTGRES_URL
               value: "postgresql://postgres:example@postgres-service:5432/postgres?sslmode=disable"
+            - name: PROFILER
+              value: ""
