@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 	"github.com/nats-io/nats.go"
 )
@@ -28,7 +27,7 @@ type Bet struct {
 
 var stats = LoadSnapshot{}
 var ctx = context.Background()
-var podID = uuid.New().String()
+var podID = os.Getenv("HOSTNAME")
 
 func storeBet(db *sql.DB, bet Bet) {
 	sqlStatement := `INSERT INTO bets (id, game_id, bet_type, amount, timestamp, pod_id) VALUES ($1, $2, $3, $4, $5, $6)`
@@ -38,7 +37,6 @@ func storeBet(db *sql.DB, bet Bet) {
 		return err
 	}, 5, 1*time.Second)
 
-	// _, err := db.Exec(sqlStatement, bet.ID, bet.GameID, bet.BetType, bet.Amount, bet.Timestamp, podID)
 	if err != nil {
 		log.Printf("Error storing bet: (id:%v) - %v", bet.ID, err)
 		stats.DbFailures++
@@ -101,7 +99,6 @@ func dbConnection() (*sql.DB, error) {
 	var db *sql.DB
 
 	dbURL := os.Getenv("POSTGRES_URL")
-	log.Println(dbURL)
 	log.Println("Connecting to Postgres...")
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
@@ -229,9 +226,8 @@ func main() {
 		// 3. Update live stats
 		stats.TotalBets++
 		stats.TotalValue += bet.Amount
-
-		// stats.PodID = os.Getenv("POD_NAME") // Or use hostname
 		stats.PodID = podID
+
 		statsJSON, _ := json.Marshal(stats)
 		nc.Publish("stats.update", statsJSON)
 	})
