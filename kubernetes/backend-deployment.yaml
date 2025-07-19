@@ -18,7 +18,7 @@ spec:
           image: real-time-betting-engine:latest
           imagePullPolicy: Never # necessary for local images
           ports:
-            - containerPort: 8082
+            - containerPort: 8081
           env:
             - name: NATS_URL
               value: "nats://host.docker.internal:4222" # Assuming a NATS service named 'nats-service'

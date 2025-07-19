@@ -18,7 +18,7 @@ spec:
           image: stats-aggregator:latest
           imagePullPolicy: Never
           ports:
-            - containerPort: 8081
+            - containerPort: 8082
           env:
             - name: NATS_URL
               value: "nats://nats-service:4222"

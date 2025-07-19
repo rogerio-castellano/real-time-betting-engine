@@ -9,6 +9,6 @@ COPY . .
 
 RUN go build -o aggregator .
 
-EXPOSE 8081
+EXPOSE 8082
 
 CMD ["./aggregator"]

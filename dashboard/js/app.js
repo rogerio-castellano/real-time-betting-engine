@@ -26,7 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
   connectSocket();
 
   function connectSocket() {
-    const socket = new WebSocket("ws://localhost:8081/ws");
+    const socket = new WebSocket("ws://localhost:8082/ws");
 
     if (retryCount >= maxRetries) {
       console.error(`❌ Max retries (${maxRetries}) reached. Giving up.`);
@@ -105,7 +105,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function showTableRowsCount() {
-    fetch("http://localhost:8082/stats")
+    fetch("http://localhost:8081/stats")
       .then((res) => res.json())
       .then((data) => {
         betsTableRowCount = data.bets_table_row_count;

@@ -14,6 +14,6 @@ FROM alpine:3.20
 COPY --from=builder /app/backend /backend
 
 # Set binary as the entrypoint
-EXPOSE 8082
+EXPOSE 8081
 ENTRYPOINT ["/backend"]
 
