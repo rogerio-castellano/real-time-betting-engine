@@ -63,7 +63,6 @@ hpa:
 
 rs: reset
 reset:
-	kubectl scale deployment stats-aggregator --replicas=0 && kubectl scale deployment betting-engine-backend --replicas=0
 	kubectl run pg-client \
 	--rm -i --tty \
 	--image=postgres:17-alpine \
@@ -81,7 +80,8 @@ reset:
 	--image=redis:7-alpine \
 	--restart=Never \
 	--command -- redis-cli -h redis-service SET game:game_123:odds_updates 0
-	kubectl scale deployment stats-aggregator --replicas=1 && kubectl scale deployment betting-engine-backend --replicas=3
+	kubectl rollout restart deployment betting-engine-backend
+	kubectl rollout restart deployment stats-aggregator
 	
 s: sync
 sync:
