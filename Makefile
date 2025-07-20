@@ -87,3 +87,7 @@ s: sync
 sync:
 	git pull
 	git push
+
+bq: bets-queue
+bets-queue:
+	docker run --rm -it natsio/nats-box:latest nats -s nats://host.docker.internal:4222 stream info bets_stream
