@@ -7,9 +7,4 @@ k:k8sbuild
 k8sbuild:
 	docker build -t stats-aggregator .
 	kubectl rollout restart deployment stats-aggregator
-# 	kubectl scale deployment stats-aggregator --replicas=0
-# 	@sleep 1
-# 	kubectl scale deployment stats-aggregator --replicas=1
-# 	@echo "Press Enter to continue..."
-# 	@read
-# 	kubectl get pods -l app=stats-aggregator
+	@date +"%T"

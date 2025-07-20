@@ -51,6 +51,7 @@ create:
 	# Apply only after your backend is live:
 	kubectl wait --for=condition=ready pod -l app=betting-engine --timeout=30s
 	kubectl apply -f ./kubernetes/hpa.yaml
+	@date +"%T"
 
 sbe:
 	kubectl scale deployment betting-engine-backend --replicas=$(r)
@@ -82,6 +83,7 @@ reset:
 	--command -- redis-cli -h redis-service SET game:game_123:odds_updates 0
 	kubectl rollout restart deployment betting-engine-backend
 	kubectl rollout restart deployment stats-aggregator
+	@date +"%T"
 	
 s: sync
 sync:
