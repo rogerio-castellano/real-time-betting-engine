@@ -198,8 +198,11 @@ func main() {
 		PoolSize: 20, // max connections
 	})
 	defer rdb.Close()
+
 	// Subscribe to the "bets" stream
-	js.QueueSubscribe("bets", "betting-engine-group", func(msg *nats.Msg) {
+	// js.QueueSubscribe("bets", "betting-engine-group", func(msg *nats.Msg) {
+	js.Subscribe("bets", func(msg *nats.Msg) {
+		log.Println("Processing queue!")
 		msg.Ack()
 		var bet Bet
 		if err := json.Unmarshal(msg.Data, &bet); err != nil {
@@ -222,7 +225,7 @@ func main() {
 
 		statsJSON, _ := json.Marshal(stats)
 		nc.Publish("stats.update", statsJSON)
-	})
+	}, nats.Durable("bets_consumer"), nats.BindStream("bets_stream"))
 
 	http.HandleFunc("/stats", statsHandler)
 
