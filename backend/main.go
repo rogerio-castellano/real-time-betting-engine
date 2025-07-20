@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	_ "net/http/pprof"
@@ -28,8 +29,10 @@ type Bet struct {
 }
 
 var stats = LoadSnapshot{}
+
 var ctx = context.Background()
 var podID = os.Getenv("HOSTNAME")
+var mu sync.Mutex
 
 func storeBet(db *sql.DB, bet Bet) {
 	sqlStatement := `INSERT INTO bets (id, game_id, bet_type, amount, timestamp, pod_id) VALUES ($1, $2, $3, $4, $5, $6)`
@@ -41,17 +44,21 @@ func storeBet(db *sql.DB, bet Bet) {
 
 	if err != nil {
 		log.Printf("Error storing bet: (id:%v) - %v", bet.ID, err)
+		mu.Lock()
 		stats.DbFailures++
+		mu.Unlock()
 	}
 }
 
 func updateOdds(rdb *redis.Client, gameID string) {
 	// In a real system, you'd have complex logic here.
 	// For this showcase, we'll just increment a key.
+
 	err := rdb.Incr(ctx, fmt.Sprintf("game:%s:odds_updates", gameID)).Err()
 	if err != nil {
-		// log.Printf("Error updating odds in Redis: %v", err)
+		mu.Lock()
 		stats.RedisFailures++
+		mu.Unlock()
 	}
 }
 
@@ -76,28 +83,7 @@ func retryWithBackoff(task func() error, maxRetries int, baseDelay time.Duration
 	return nil
 }
 
-func connectJetStream() (*nats.Conn, nats.JetStreamContext, func(), error) {
-	log.Println("Connecting to NATS...")
-
-	nc, err := nats.Connect(os.Getenv("NATS_URL"))
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	cleanup := func() {
-		nc.Close()
-	}
-
-	js, err := nc.JetStream()
-	if err != nil {
-		cleanup()
-		return nil, nil, nil, err
-	}
-
-	return nc, js, cleanup, nil
-}
-
-func dbConnection() (*sql.DB, error) {
+func dbConnection(ctx context.Context) (*sql.DB, error) {
 	var db *sql.DB
 
 	dbURL := os.Getenv("POSTGRES_URL")
@@ -106,9 +92,6 @@ func dbConnection() (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("sql.Open failed: %v", err)
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
 
 	log.Println("Calling db.PingContext...")
 	for i := range 5 {
@@ -128,20 +111,9 @@ func dbConnection() (*sql.DB, error) {
 	return db, nil
 }
 
-func redisConnection() *redis.Client {
-	log.Println("Connecting to Redis...")
-	rdb := redis.NewClient(&redis.Options{
-		Addr: os.Getenv("REDIS_URL"),
-	})
-
-	return rdb
-}
-
-var dbStats *sql.DB
-var jsStats nats.JetStreamContext
-var rdbStats *redis.Client
-
 func statsHandler(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
@@ -152,25 +124,40 @@ func statsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var count int
-	err := dbStats.QueryRow("SELECT COUNT(*) FROM bets;").Scan(&count)
+	db, err := dbConnection(r.Context())
+	if err != nil {
+		http.Error(w, "DB connection failed", http.StatusInternalServerError)
+		log.Fatalln(err)
+	}
+	defer db.Close()
+
+	err = db.QueryRow("SELECT COUNT(*) FROM bets;").Scan(&count)
 	if err != nil {
 		log.Printf("DB query failed: %v", err)
 		http.Error(w, "DB query failed", http.StatusInternalServerError)
 		return
 	}
 
-	stream, err := jsStats.StreamInfo("bets_stream")
+	js, err := nc.JetStream()
 	if err != nil {
-		log.Fatal(err)
+		nc.Close()
+		http.Error(w, "DB connection failed", http.StatusInternalServerError)
+		log.Printf("Error getting JetStream Context: %v", err)
+	}
+
+	stream, err := js.StreamInfo("bets_stream")
+	if err != nil {
+		http.Error(w, "Get Bets stream failed", http.StatusInternalServerError)
+		log.Printf("Get Bets stream failed: %v", err)
 	}
 
 	pendingBets := int(stream.State.Msgs)
 
 	gameID := "game_123"
-	redisCount, err := rdbStats.Get(ctx, fmt.Sprintf("game:%s:odds_updates", gameID)).Int()
-	if err != nil {
-		// log.Printf("Error updating odds in Redis: %v", err)
-		stats.RedisFailures++
+	redisCount, err := rdb.Get(ctx, fmt.Sprintf("game:%s:odds_updates", gameID)).Int()
+	if err != nil && err != redis.Nil {
+		http.Error(w, "Get Odds update failed", http.StatusInternalServerError)
+		log.Printf("Get Odds update failed: %v", err)
 	}
 
 	json.NewEncoder(w).Encode(map[string]int{"bets_table_row_count": count,
@@ -178,36 +165,39 @@ func statsHandler(w http.ResponseWriter, r *http.Request) {
 		"pending_bets": pendingBets})
 }
 
+var nc *nats.Conn
+var rdb *redis.Client
+
 func main() {
-	nc, js, closeNATS, err := connectJetStream()
+	ncLocal, err := nats.Connect(os.Getenv("NATS_URL"))
 	if err != nil {
 		log.Fatalf("Error connecting to NATS: %v.\nCheck if port forwarding is set up (kubectl port-forward svc/nats-service 4222:4222)", err)
 	}
-	defer closeNATS()
+	nc = ncLocal
 
-	_, jsLocalStats, closeNATSStats, err := connectJetStream()
+	js, err := nc.JetStream()
 	if err != nil {
-		log.Fatalf("Error connecting to NATS: %v.\nCheck if port forwarding is set up (kubectl port-forward svc/nats-service 4222:4222)", err)
-	}
-	defer closeNATSStats()
-	jsStats = jsLocalStats
-
-	// --- Connect to Postgres ---
-	db, err := dbConnection()
-	if err != nil {
-		log.Fatalln(err)
+		nc.Close()
+		log.Fatalf("Error getting JetStream Context: %v", err)
 	}
 
-	dbLocalStats, err := dbConnection()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	db, err := dbConnection(ctx)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	dbStats = dbLocalStats
+	defer db.Close()
+	db.SetMaxOpenConns(50)
+	db.SetMaxIdleConns(30)
 
-	// --- Connect to Redis ---
-	rdb := redisConnection()
-	rdbStats = redisConnection()
-
+	log.Println("Connecting to Redis...")
+	rdb = redis.NewClient(&redis.Options{
+		Addr:     os.Getenv("REDIS_URL"),
+		PoolSize: 20, // max connections
+	})
+	defer rdb.Close()
 	// Subscribe to the "bets" stream
 	js.QueueSubscribe("bets", "betting-engine-group", func(msg *nats.Msg) {
 		msg.Ack()
@@ -240,7 +230,6 @@ func main() {
 		log.Println("Running Profiler")
 		go http.ListenAndServe(":6060", nil)
 	}
-
 	log.Println("Server started on :8081")
 	log.Fatal(http.ListenAndServe(":8081", nil))
 }
