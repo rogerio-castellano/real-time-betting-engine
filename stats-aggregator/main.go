@@ -22,6 +22,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+var updated bool = true
 var merged PodStats
 
 func handleWebSocket(w http.ResponseWriter, r *http.Request) {
@@ -34,9 +35,12 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	for {
 		time.Sleep(1 * time.Second)
-		if err := conn.WriteJSON(merged); err != nil {
-			log.Println("WebSocket write error:", err)
-			break
+		if updated {
+			if err := conn.WriteJSON(merged); err != nil {
+				log.Println("WebSocket write error:", err)
+				break
+			}
+			updated = false
 		}
 	}
 }
@@ -78,6 +82,7 @@ func main() {
 		mu.Lock()
 		podStatsMap[podStats.PodID] = podStats
 		mu.Unlock()
+		updated = true
 	})
 
 	var last PodStats
