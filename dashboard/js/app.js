@@ -58,6 +58,10 @@ document.addEventListener("DOMContentLoaded", () => {
       redisFailuresPerSecondElem.textContent = stats.redis_failures_per_second.toLocaleString();
       dbFailuresElem.textContent = stats.db_failures.toLocaleString();
       redisFailuresElem.textContent = stats.redis_failures.toLocaleString();
+
+      const cardClasses = rowsCountElem.parentElement.classList;
+      setColorClass(cardClasses, "color-outdated");
+      console.log(event.data);
     };
 
     socket.onclose = () => {
@@ -109,39 +113,33 @@ document.addEventListener("DOMContentLoaded", () => {
       .then((res) => res.json())
       .then((data) => {
         betsTableRowCount = data.bets_table_row_count;
-        rowsCountElem.textContent = betsTableRowCount;
+        rowsCountElem.textContent = betsTableRowCount.toLocaleString();
 
         const errorsRate = (ingestedBetsCount - betsTableRowCount) / ingestedBetsCount;
 
-        const thresholds = [
-          { limit: 0.01, color: "color7" },
-          { limit: 0.008, color: "color6" },
-          { limit: 0.006, color: "color5" },
-          { limit: 0.004, color: "color4" },
-          { limit: 0.002, color: "color3" },
-          { limit: 0, color: "color2" },
-        ];
+        let color = "color-undetermined";
+        if (errorsRate >= 0) {
+          const thresholds = [
+            { lowerBound: 0.01, color: "color7" },
+            { lowerBound: 0.008, color: "color6" },
+            { lowerBound: 0.006, color: "color5" },
+            { lowerBound: 0.004, color: "color4" },
+            { lowerBound: 0.002, color: "color3" },
+            { lowerBound: 0, color: "color2" },
+          ];
+          color = "color1"; // default for exact match
 
-        let color = "color1"; // default for exact match
-
-        for (const { limit, color: c } of thresholds) {
-          if (errorsRate > limit) {
-            color = c;
-            break;
+          for (const { lowerBound, color: c } of thresholds) {
+            if (errorsRate > lowerBound) {
+              color = c;
+              break;
+            }
           }
         }
 
         const cardClasses = rowsCountElem.parentElement.classList;
+        setColorClass(cardClasses, color);
 
-        if (cardClasses > 2) {
-          card.classList.forEach((element) => {
-            if (element.IndexOf("color") != -1) {
-              cardClasses.remove(element);
-            }
-          });
-        }
-
-        cardClasses.add(color);
         totalOddsElem.textContent = data.total_odds.toLocaleString();
         pendingBetsElem.textContent = data.pending_bets.toLocaleString();
       })
@@ -165,4 +163,15 @@ function formattedTime(date) {
   const seconds = String(date.getSeconds()).padStart(2, "0");
 
   return `${hours}:${minutes}:${seconds}`;
+}
+
+function setColorClass(elementClasses, color) {
+  if (elementClasses.length > 2) {
+    elementClasses.forEach((element) => {
+      if (element.indexOf("color") != -1) {
+        elementClasses.remove(element);
+      }
+    });
+  }
+  elementClasses.add(color);
 }

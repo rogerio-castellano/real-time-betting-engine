@@ -152,6 +152,16 @@ body {
   border-right: 4px solid red;
   border-bottom: 4px solid red;
 }
+.card.color-undetermined {
+  border-top: 4px solid white;
+  border-right: 4px solid white;
+  border-bottom: 4px solid white;
+}
+.card.color-outdated {
+  border-top: 4px solid gray;
+  border-right: 4px solid gray;
+  border-bottom: 4px solid gray;
+}
 
 h2.section-header {
   font-size: 1.75rem;
