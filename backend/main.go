@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	_ "net/http/pprof"
@@ -199,33 +200,58 @@ func main() {
 	})
 	defer rdb.Close()
 
+	var wg sync.WaitGroup
+	var activeWorkers int64
+	maxWorkers := 80 // Limit the number of concurrent workers
 	// Subscribe to the "bets" stream
-	// js.QueueSubscribe("bets", "betting-engine-group", func(msg *nats.Msg) {
-	js.Subscribe("bets", func(msg *nats.Msg) {
-		log.Println("Processing queue!")
-		msg.Ack()
-		var bet Bet
-		if err := json.Unmarshal(msg.Data, &bet); err != nil {
-			log.Printf("Error unmarshaling bet: %v", err)
-			return
+	js.QueueSubscribe("bets", "betting-engine-group", func(msg *nats.Msg) {
+		if atomic.LoadInt64(&activeWorkers) >= int64(maxWorkers) {
+			log.Println("Max workers reached, waiting...")
+			time.Sleep(100 * time.Millisecond) // Wait before retrying
 		}
-		if time.Now().Nanosecond()%100000 == 0 {
-			log.Print(&bet)
-		}
-		// 1. Process and store the bet in the database
-		go storeBet(db, bet)
 
-		// 2. Update odds in Redis (example logic)
-		go updateOdds(rdb, bet.GameID)
+		wg.Add(1)
+		atomic.AddInt64(&activeWorkers, 1)
 
-		// 3. Update live stats
-		stats.TotalBets++
-		stats.TotalValue += bet.Amount
-		stats.PodID = podID
+		go func(m *nats.Msg) {
+			var bet Bet
+			// Acknowledge the message
+			if err := msg.Ack(); err != nil {
+				//TODO Fix high number of already acknowledged message
+				if err != nats.ErrMsgAlreadyAckd {
+					log.Printf("Error acknowledging message: %v", err)
+				}
+			}
 
-		statsJSON, _ := json.Marshal(stats)
-		nc.Publish("stats.update", statsJSON)
+			defer wg.Done()
+			defer atomic.AddInt64(&activeWorkers, -1)
+
+			if err := json.Unmarshal(msg.Data, &bet); err != nil {
+				log.Printf("Error unmarshaling bet: %v", err)
+				return
+			}
+			if time.Now().Nanosecond()%100000 == 0 {
+				log.Print(&bet)
+			}
+			// 1. Process and store the bet in the database
+			go storeBet(db, bet)
+
+			// 2. Update odds in Redis (example logic)
+			go updateOdds(rdb, bet.GameID)
+
+			// 3. Update live stats
+			mu.Lock()
+			stats.TotalBets++
+			stats.TotalValue += bet.Amount
+			stats.PodID = podID
+			mu.Unlock()
+			statsJSON, _ := json.Marshal(stats)
+			nc.Publish("stats.update", statsJSON)
+		}(msg)
 	}, nats.Durable("bets_consumer"), nats.BindStream("bets_stream"))
+
+	// Wait for all workers to finish
+	wg.Wait()
 
 	http.HandleFunc("/stats", statsHandler)
 
