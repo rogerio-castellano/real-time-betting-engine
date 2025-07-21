@@ -26,6 +26,11 @@ func main() {
 		log.Fatalf("Error connecting to NATS: %v", err)
 	}
 	defer nc.Close()
+	js, err := nc.JetStream()
+	if err != nil {
+		nc.Close()
+		log.Fatalf("Error getting JetStream Context: %v", err)
+	}
 
 	ms, _ := strconv.ParseInt(os.Args[1], 10, 64)
 	if ms == 0 {
@@ -48,14 +53,14 @@ func main() {
 			Timestamp: time.Now(),
 		}
 		betJSON, _ := json.Marshal(bet)
-		if err := nc.Publish("bets", betJSON); err != nil {
-			log.Printf("Error publishing bet: %v", err)
-		}
+		js.PublishAsync("bets", betJSON)
 		time.Sleep(time.Duration(ms) * time.Millisecond) // Adjust for desired throughput
 
 		counter++
 		if counter >= bets {
+			<-js.PublishAsyncComplete()
 			return
 		}
 	}
+
 }
