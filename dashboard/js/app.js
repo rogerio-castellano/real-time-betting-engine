@@ -61,7 +61,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const cardClasses = rowsCountElem.parentElement.classList;
       setColorClass(cardClasses, "color-outdated");
-      console.log(event.data);
     };
 
     socket.onclose = () => {
@@ -152,7 +151,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function stopShowTableRowsCount() {
     if (intervalId != -1) {
       clearInterval(intervalId);
-      rowsCountElem.textContent = "CONNECTION DISABLED";
+      rowsCountElem.textContent = "(waiting connection)";
     }
   }
 });
