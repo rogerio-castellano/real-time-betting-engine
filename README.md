@@ -1,12 +1,10 @@
 # 🎯 Real-Time Betting Engine
 
-> 🚧 Work In Progress — This is an evolving real-time engine built for speed, scale, and live insights. Some features may be experimental or incomplete.
+> 🚧 Work in Progress — This evolving real-time betting engine is built for speed, scalability, and live insights. Some features are experimental or incomplete, with active exploration into resilience, profiling, and autoscaling.
 
 A fast, horizontally scalable betting engine designed for real-time ingest, aggregation, and performance visualization — powered by Go, NATS JetStream, PostgreSQL, Redis, and Kubernetes.
 
 > ⚡ Built for speed. 📊 Tuned for stats. 🧠 Optimized for concurrency.
-
-**_This a WIP (Work in progress)_**
 
 ## 🔥 Features
 
